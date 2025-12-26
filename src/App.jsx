@@ -7,11 +7,13 @@ import Demo from './components/Demo';
 import Pricing from './components/Pricing';
 import AuthModal from './components/AuthModal';
 import Features from './components/Features'; 
+import SmartCards from './components/SmartCards';
 
 const LandingPage = ({ onOpenAuth }) => (
   <>
     <Hero onOpenAuth={onOpenAuth} />
     <Demo />
+    <SmartCards />
     <Pricing onPlanSelect={() => onOpenAuth('signup')} />
   </>
 );
