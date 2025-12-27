@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { useLanguage } from '../context/LanguageContext';
-// ضفنا Square للأيقونات المستوردة
 import { Send, Bot, Video, Keyboard, Loader2, Mic, Square, AlertTriangle, Heart, ChevronDown, List } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -11,29 +10,11 @@ const SENTIMENT_CONFIG = {
   positive: { color: 'rose', bg: 'bg-rose-500', hover: 'hover:bg-rose-600', text: 'text-rose-500', border: 'border-rose-200', ring: 'focus:ring-rose-500', shadow: 'shadow-rose-500/20' }
 };
 
-// 1. القائمة المحدثة
 const PREDEFINED_SENTENCES = [
-  { id: 'tired', ar: "أنا تعبان", en: "I am tired", mood: 'danger', filename: 'انا تعبان.mp4' },
-  { id: 'cured', ar: "أنا خفيت", en: "I recovered", mood: 'positive', filename: 'انا خفيت.mp4' },
-  { id: 'work', ar: "أنا رايح الشغل", en: "I am going to work", mood: 'neutral', filename: 'انا رايح الشغل.mp4' },
-  { id: 'school', ar: "أنا رايح المدرسة", en: "I am going to school", mood: 'neutral', filename: 'انا رايح المدرسة.mp4' },
-  { id: 'hospital', ar: "أنا عايز أروح المستشفى", en: "I want to go to the hospital", mood: 'danger', filename: 'انا عايز اروح المستشفى.mp4' },
-  { id: 'eat', ar: "أنا عايز آكل", en: "I want to eat", mood: 'neutral', filename: 'انا عايز اكل.mp4' },
-  { id: 'help_me', ar: "أنا عايز مساعدة", en: "I want help", mood: 'danger', filename: 'انا عايز مساعدة.mp4' },
-  { id: 'help_you', ar: "أنت عايز مساعدة", en: "Do you want help?", mood: 'neutral', filename: 'انت عايز مساعدة.mp4' },
-  { id: 'address', ar: "عنوانك بالتفصيل", en: "Your detailed address", mood: 'neutral', filename: 'عنوانك بالتفصيل.mp4' },
+  { id: 'work', ar: "أنا رايح الشغل", en: "I am going to work", mood: 'neutral' },
+  { id: 'tired', ar: "أنا تعبان", en: "I am tired", mood: 'danger' },
+  { id: 'cured', ar: "أنا خفيت", en: "I recovered", mood: 'positive' },
 ];
-
-// 2. دالة التنظيف
-const normalizeArabic = (text) => {
-  if (!text) return "";
-  return text
-    .replace(/[أإآ]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .replace(/ى/g, 'ي')
-    .replace(/[ًٌٍَُِّْ]/g, '')
-    .trim();
-};
 
 export default function Demo() {
   const { t, lang } = useLanguage();
@@ -44,69 +25,77 @@ export default function Demo() {
   const [outputText, setOutputText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentMood, setCurrentMood] = useState('neutral');
-  
   const [currentVideoSrc, setCurrentVideoSrc] = useState(null);
 
-  // Voice & Camera
+  // Voice & Camera States
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   
   const webcamRef = useRef(null);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef = useRef([]);
 
   const theme = SENTIMENT_CONFIG[currentMood];
 
-  // تحليل المشاعر
-  useEffect(() => {
-    const text = inputText.toLowerCase();
-    if (text.match(/hospital|help|die|pain|emergency|hurt|مستشفى|نجدة|موت|ألم|تعبان|خطر|إسعاف/i)) {
-      setCurrentMood('danger');
-    } else if (text.match(/love|good|happy|thanks|great|أحبك|تمام|شكرا|سعيد|ممتاز|الحمد لله|خفيت/i)) {
-      setCurrentMood('positive');
-    } else {
-      setCurrentMood('neutral');
-    }
-  }, [inputText]);
+  // --- Fake Backend Logic (The Trick) ---
+  const fakeProcessVideo = () => {
+    setIsProcessing(true);
+    setOutputText(''); // Reset text
+    
+    // 1. استنى ثانيتين كأن السيرفر بيفكر
+    setTimeout(() => {
+      setIsProcessing(false);
+      
+      // 2. طلع النتيجة الثابتة اللي انت عايزها
+      const fixedResult = lang === 'ar' ? "أنا رايح الشغل" : "I am going to work";
+      setOutputText(fixedResult);
+      
+      // 3. ممكن تغير المود كمان لو حابب (هنا خليته عادي)
+      setCurrentMood('neutral'); 
+      
+    }, 2000); // 2000ms = 2 seconds delay
+  };
 
-  // إعداد الصوت (Start/Stop Logic)
+  const startRecording = useCallback(() => {
+    setIsRecording(true);
+    // مش محتاجين MediaRecorder بجد هنا لأننا هنفبرك النتيجة
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    setIsRecording(false);
+    // بدل ما نبعت الفيديو للسيرفر، هننادي دالة الفبركة
+    fakeProcessVideo();
+  }, [lang]); // ضفت lang عشان يغير النتيجة حسب اللغة
+
+  const handleCameraToggle = () => {
+    if (!isCameraActive) { 
+        setIsCameraActive(true); 
+        setOutputText(''); 
+    } else { 
+        isRecording ? stopRecording() : startRecording(); 
+    }
+  };
+  // --------------------------------------
+
+  // (Speech Recognition Logic - Optional Keep/Remove)
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true; // استمرار التسجيل
-      recognitionRef.current.interimResults = true; // نتائج لحظية
-    } else {
-      console.warn("Speech Recognition API not supported.");
+      recognitionRef.current.continuous = true; 
+      recognitionRef.current.interimResults = true; 
     }
   }, []);
 
-  // دالة التحكم في المايك
   const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert("المتصفح لا يدعم هذه الخاصية. يرجى استخدام Google Chrome.");
-      return;
-    }
-
+    if (!recognitionRef.current) return;
     if (isListening) {
-      // إيقاف التسجيل
       recognitionRef.current.stop();
       setIsListening(false);
-      console.log("Microphone stopped manually.");
     } else {
-      // بدء التسجيل
       recognitionRef.current.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
-      
       recognitionRef.current.onstart = () => setIsListening(true);
       recognitionRef.current.onend = () => setIsListening(false);
-      
-      recognitionRef.current.onerror = (event) => {
-        console.error("Speech Error:", event.error);
-        setIsListening(false);
-      };
-
       recognitionRef.current.onresult = (event) => {
         let finalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -114,93 +103,25 @@ export default function Demo() {
         }
         setInputText(finalTranscript);
       };
-
-      try {
-        recognitionRef.current.start();
-      } catch (e) {
-        console.error("Error starting speech recognition:", e);
-      }
+      recognitionRef.current.start();
     }
   };
 
-  // Backend API
-  const sendVideoToBackend = async (videoBlob) => {
-    setIsProcessing(true);
-    setOutputText('');
-    const formData = new FormData();
-    formData.append('file', videoBlob, 'sign_video.webm');
-
-    try {
-      const response = await fetch('http://localhost:8000/predict', { method: 'POST', body: formData });
-      if (!response.ok) throw new Error(`Error: ${response.status}`);
-      const data = await response.json();
-      setOutputText(data.result || (lang === 'ar' ? "لم يتم التعرف" : "Unknown"));
-    } catch (error) {
-      console.error(error);
-      setOutputText(lang === 'ar' ? "خطأ في الاتصال بالخادم" : "Server Connection Error");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // Camera Recording
-  const startRecording = useCallback(() => {
-    setIsRecording(true);
-    chunksRef.current = [];
-    if (webcamRef.current && webcamRef.current.video.srcObject) {
-      const mimeType = MediaRecorder.isTypeSupported("video/webm; codecs=vp8") ? "video/webm; codecs=vp8" : "video/webm";
-      mediaRecorderRef.current = new MediaRecorder(webcamRef.current.video.srcObject, { mimeType: mimeType });
-      mediaRecorderRef.current.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mediaRecorderRef.current.onstop = () => {
-        sendVideoToBackend(new Blob(chunksRef.current, { type: "video/webm" }));
-      };
-      mediaRecorderRef.current.start();
-    }
-  }, [webcamRef]);
-
-  const stopRecording = useCallback(() => {
-    setIsRecording(false);
-    if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
-  }, []);
-
-  const handleCameraToggle = () => {
-    if (!isCameraActive) { setIsCameraActive(true); setOutputText(''); }
-    else { isRecording ? stopRecording() : startRecording(); }
-  };
-
-  // Search Logic (Normalized)
-  const handleTextSubmit = async () => {
+  // Text Logic (Static Alert)
+  const handleTextSubmit = () => {
     if (!inputText.trim()) return;
     setIsProcessing(true);
-    setCurrentVideoSrc(null); 
-
-    const normalizedInput = normalizeArabic(inputText);
-    const lowerInput = inputText.toLowerCase().trim();
-
-    const foundSentence = PREDEFINED_SENTENCES.find(s => {
-        const normalizedStoredAr = normalizeArabic(s.ar);
-        const lowerStoredEn = s.en ? s.en.toLowerCase() : "";
-        if (normalizedStoredAr.includes(normalizedInput) || normalizedInput.includes(normalizedStoredAr)) return true;
-        if (lowerStoredEn.includes(lowerInput) || lowerInput.includes(lowerStoredEn)) return true;
-        return false;
-    });
-
+    // محاكاة تحميل بسيطة للنص برضه
     setTimeout(() => {
-      if (foundSentence && foundSentence.filename) {
-        const videoUrl = `http://localhost:8000/animations/${foundSentence.filename}`;
-        setCurrentVideoSrc(videoUrl);
-      } else {
-        setCurrentVideoSrc(null);
-        alert(lang === 'ar' ? "لا يوجد فيديو لهذه الجملة حالياً" : "No video found");
-      }
-      setIsProcessing(false);
-    }, 800);
+        setIsProcessing(false);
+        alert(lang === 'ar' ? "في النسخة التجريبية، تشغيل الفيديو غير متاح بدون سيرفر." : "Video playback disabled in static demo.");
+    }, 1000);
   };
 
   return (
     <section id="demo" className="py-24 bg-slate-50 relative overflow-hidden transition-colors duration-700">
       
-      {/* Sound Monitor */}
+      {/* Sound Monitor Visual only */}
        <div className="absolute top-4 right-4 md:top-10 md:right-10 flex items-center gap-2 z-20">
          <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-full shadow-sm flex items-center gap-3 border border-slate-200">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:block">
@@ -211,7 +132,6 @@ export default function Demo() {
                 <motion.div animate={{ height: [14, 24, 10] }} transition={{ repeat: Infinity, duration: 0.4 }} className={`w-1 rounded-full ${currentMood === 'danger' ? 'bg-red-500' : 'bg-slate-400'}`}></motion.div>
                 <motion.div animate={{ height: [8, 18, 8] }} transition={{ repeat: Infinity, duration: 0.6 }} className={`w-1 rounded-full ${currentMood === 'danger' ? 'bg-red-500' : 'bg-slate-400'}`}></motion.div>
             </div>
-            {currentMood === 'danger' && <AlertTriangle size={16} className="text-red-500 animate-pulse" />}
          </div>
       </div>
 
@@ -254,7 +174,6 @@ export default function Demo() {
               {mode === 'text-to-sign' ? (
                 <motion.div key="text-input" initial={{opacity:0, x:-20}} animate={{opacity:1, x:0}} exit={{opacity:0, x:20}} className="flex-1 flex flex-col gap-4">
                   
-                  {/* Dropdown */}
                   <div className="relative group">
                     <List size={18} className="absolute left-3 top-3.5 text-slate-400 pointer-events-none" />
                     <select
@@ -271,7 +190,6 @@ export default function Demo() {
                     <ChevronDown size={16} className={`absolute ${lang === 'ar' ? 'left-3' : 'right-3'} top-3.5 text-slate-400 pointer-events-none`} />
                   </div>
 
-                  {/* Textarea */}
                   <div className={`flex-1 bg-white rounded-2xl p-2 shadow-inner border focus-within:ring-2 transition-all relative flex flex-col ${theme.border} ${theme.ring}`}>
                     <textarea 
                       className="w-full flex-1 bg-transparent border-none focus:ring-0 resize-none text-slate-800 text-lg p-2"
@@ -281,20 +199,9 @@ export default function Demo() {
                       dir={lang === 'ar' ? 'rtl' : 'ltr'}
                     />
                     <div className="flex justify-between items-center p-2 border-t border-slate-100">
-                         <div className="flex gap-2 text-sm font-medium transition-colors duration-500">
-                            {currentMood === 'danger' && <span className="text-red-500 flex items-center gap-1"><AlertTriangle size={14}/> حالة طوارئ</span>}
-                            {currentMood === 'positive' && <span className="text-rose-500 flex items-center gap-1"><Heart size={14}/> إيجابي</span>}
-                        </div>
-                        
-                        {/* 🔥 الزرار الجديد (مايك / إيقاف) */}
                         <button 
                             onClick={toggleListening} 
-                            className={`p-3 rounded-full transition-all duration-300 ${
-                                isListening 
-                                ? 'bg-red-500 text-white shadow-lg shadow-red-500/50 animate-pulse' 
-                                : 'bg-slate-100 text-slate-500 hover:text-teal-600 hover:bg-slate-200'
-                            }`}
-                            title={isListening ? (lang === 'ar' ? "إيقاف التسجيل" : "Stop Recording") : (lang === 'ar' ? "بدء التسجيل" : "Start Recording")}
+                            className={`p-3 rounded-full transition-all duration-300 ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-slate-500'}`}
                         >
                             {isListening ? <Square size={20} fill="currentColor" /> : <Mic size={20} />}
                         </button>
@@ -311,11 +218,12 @@ export default function Demo() {
                   </button>
                 </motion.div>
               ) : (
-                // Camera Mode
+                // Camera Mode (Fake Logic Applied Here)
                 <motion.div key="camera-input" initial={{opacity:0}} animate={{opacity:1}} className="flex-1 flex flex-col">
                   <div className="flex-1 bg-black rounded-2xl overflow-hidden relative min-h-[300px]">
                     {isCameraActive ? (
                       <>
+                        {/* We use Webcam purely for display now, no recording data sent */}
                         <Webcam ref={webcamRef} audio={false} className="w-full h-full object-cover transform scale-x-[-1]" />
                         {isRecording && <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full animate-pulse z-30 text-xs font-bold">REC</div>}
                         <div className={`absolute top-0 left-0 w-full h-1 shadow-[0_0_15px] animate-[scan_2s_ease-in-out_infinite] z-20 ${currentMood === 'danger' ? 'bg-red-500 shadow-red-500' : 'bg-teal-400 shadow-teal-400'}`}></div>
@@ -325,7 +233,7 @@ export default function Demo() {
                     )}
                   </div>
                   <button onClick={handleCameraToggle} className={`mt-4 w-full py-4 rounded-xl font-bold text-white transition flex justify-center items-center gap-2 shadow-lg ${!isCameraActive ? `${theme.bg} ${theme.hover}` : isRecording ? 'bg-red-500 animate-pulse' : 'bg-slate-800'}`}>
-                    {!isCameraActive ? t.demo.camera_btn_start : isRecording ? (lang === 'ar' ? 'إيقاف' : 'Stop') : (lang === 'ar' ? 'تسجيل' : 'Record')}
+                    {!isCameraActive ? t.demo.camera_btn_start : isRecording ? (lang === 'ar' ? 'إيقاف وإنهاء' : 'Stop & Finish') : (lang === 'ar' ? 'تسجيل' : 'Record')}
                   </button>
                 </motion.div>
               )}
@@ -344,30 +252,24 @@ export default function Demo() {
 
              <div className="flex-1 flex flex-col items-center justify-center relative z-10 w-full">
                 {isProcessing ? (
-                    <div className="text-center"><Loader2 size={48} className={`animate-spin mb-4 ${currentMood === 'danger' ? 'text-red-500' : 'text-teal-500'}`}/><p className="text-slate-400">Processing...</p></div>
+                    <div className="text-center"><Loader2 size={48} className={`animate-spin mb-4 ${currentMood === 'danger' ? 'text-red-500' : 'text-teal-500'}`}/><p className="text-slate-400">Analyzing Sign Language...</p></div>
                 ) : mode === 'text-to-sign' ? (
-                    currentVideoSrc ? (
-                         <div className="w-full h-full flex items-center justify-center">
-                            <video 
-                                key={currentVideoSrc} 
-                                src={currentVideoSrc} 
-                                autoPlay 
-                                controls 
-                                className="w-full h-auto rounded-xl border-2 border-slate-700 shadow-2xl"
-                            />
-                         </div>
-                    ) : (
-                        <div className="relative group cursor-pointer w-full flex flex-col items-center">
-                          <div className={`w-64 h-64 rounded-full flex items-center justify-center border-4 transition-all duration-500 relative ${currentMood === 'danger' ? 'border-red-900 shadow-red-900/50' : 'border-slate-700 shadow-teal-900/20'}`}>
-                              <Bot size={100} className={`transition-all duration-500 ${currentMood === 'danger' ? 'text-red-500' : currentMood === 'positive' ? 'text-rose-400' : 'text-teal-500/50'}`} />
-                          </div>
-                          <p className="mt-8 text-slate-500 text-sm">{t.demo.avatar_placeholder_subtitle}</p>
+                     // Placeholder for Text-to-Sign in Demo Mode
+                    <div className="relative group cursor-pointer w-full flex flex-col items-center">
+                        <div className={`w-64 h-64 rounded-full flex items-center justify-center border-4 transition-all duration-500 relative ${theme.border}`}>
+                            <Bot size={100} className={`transition-all duration-500 ${theme.text}`} />
                         </div>
-                    )
+                        <p className="mt-8 text-slate-500 text-sm">Animation Playback</p>
+                    </div>
                 ) : (
-                    <div className="w-full bg-slate-800/50 backdrop-blur-md rounded-2xl p-6 border border-slate-700 min-h-[200px]">
-                       <h4 className="text-slate-400 text-sm font-bold mb-4 border-b border-slate-700 pb-2">Translation</h4>
-                       <p className="text-2xl font-medium text-white">{outputText || "..."}</p>
+                    // Sign-to-Text Result (This will show "I am going to work")
+                    <div className="w-full bg-slate-800/50 backdrop-blur-md rounded-2xl p-6 border border-slate-700 min-h-[200px] flex items-center justify-center">
+                       <div className="text-center w-full">
+                           <h4 className="text-slate-400 text-sm font-bold mb-4 border-b border-slate-700 pb-2">Detected Meaning</h4>
+                           <p className="text-3xl md:text-4xl font-black text-white animate-in fade-in zoom-in duration-500">
+                               {outputText || "..."}
+                           </p>
+                       </div>
                     </div>
                 )}
              </div>
