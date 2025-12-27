@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { useLanguage } from '../context/LanguageContext';
-import { Send, Bot, Video, Keyboard, Loader2, Mic, Square, AlertTriangle, Heart, ChevronDown, List } from 'lucide-react';
+// ضفنا أيقونة SwitchCamera
+import { Send, Bot, Video, Keyboard, Loader2, Mic, Square, AlertTriangle, Heart, ChevronDown, List, SwitchCamera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const SENTIMENT_CONFIG = {
@@ -30,42 +31,42 @@ export default function Demo() {
   // Voice & Camera States
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   
+  // --- تعديل الكاميرا (Default: environment للكاميرا الخلفية) ---
+  const [facingMode, setFacingMode] = useState('environment'); 
   const webcamRef = useRef(null);
 
   const theme = SENTIMENT_CONFIG[currentMood];
 
-  // --- Fake Backend Logic (The Trick) ---
+  // دالة قلب الكاميرا
+  const toggleCameraFacing = () => {
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+  };
+
+  // --- Fake Backend Logic ---
   const fakeProcessVideo = () => {
     setIsProcessing(true);
-    setOutputText(''); // Reset text
+    setOutputText(''); 
     
-    // 1. استنى ثانيتين كأن السيرفر بيفكر
     setTimeout(() => {
       setIsProcessing(false);
-      
-      // 2. طلع النتيجة الثابتة اللي انت عايزها
       const fixedResult = lang === 'ar' ? "أنا رايح الشغل" : "I am going to work";
       setOutputText(fixedResult);
-      
-      // 3. ممكن تغير المود كمان لو حابب (هنا خليته عادي)
       setCurrentMood('neutral'); 
-      
-    }, 2000); // 2000ms = 2 seconds delay
+    }, 2000); 
   };
 
   const startRecording = useCallback(() => {
     setIsRecording(true);
-    // مش محتاجين MediaRecorder بجد هنا لأننا هنفبرك النتيجة
   }, []);
 
   const stopRecording = useCallback(() => {
     setIsRecording(false);
-    // بدل ما نبعت الفيديو للسيرفر، هننادي دالة الفبركة
     fakeProcessVideo();
-  }, [lang]); // ضفت lang عشان يغير النتيجة حسب اللغة
+  }, [lang]); 
 
   const handleCameraToggle = () => {
     if (!isCameraActive) { 
@@ -75,9 +76,8 @@ export default function Demo() {
         isRecording ? stopRecording() : startRecording(); 
     }
   };
-  // --------------------------------------
 
-  // (Speech Recognition Logic - Optional Keep/Remove)
+  // Speech Recognition (Optional)
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -107,11 +107,9 @@ export default function Demo() {
     }
   };
 
-  // Text Logic (Static Alert)
   const handleTextSubmit = () => {
     if (!inputText.trim()) return;
     setIsProcessing(true);
-    // محاكاة تحميل بسيطة للنص برضه
     setTimeout(() => {
         setIsProcessing(false);
         alert(lang === 'ar' ? "في النسخة التجريبية، تشغيل الفيديو غير متاح بدون سيرفر." : "Video playback disabled in static demo.");
@@ -121,7 +119,6 @@ export default function Demo() {
   return (
     <section id="demo" className="py-24 bg-slate-50 relative overflow-hidden transition-colors duration-700">
       
-      {/* Sound Monitor Visual only */}
        <div className="absolute top-4 right-4 md:top-10 md:right-10 flex items-center gap-2 z-20">
          <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-full shadow-sm flex items-center gap-3 border border-slate-200">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider hidden md:block">
@@ -141,7 +138,6 @@ export default function Demo() {
         </motion.h2>
       </div>
 
-      {/* Tabs */}
       <div className="flex justify-center mb-10 relative z-10">
         <div className="bg-white p-1.5 rounded-full shadow-md border border-slate-200 inline-flex">
           <button 
@@ -159,11 +155,9 @@ export default function Demo() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-6xl mx-auto px-4 relative z-10">
         <motion.div layout className={`bg-white rounded-3xl shadow-2xl overflow-hidden border transition-all duration-500 flex flex-col lg:flex-row min-h-[600px] ${theme.border} ${theme.shadow}`}>
           
-          {/* Inputs */}
           <div className="lg:w-1/2 p-6 flex flex-col border-b lg:border-b-0 lg:border-r border-slate-100 bg-slate-50/30">
             <h3 className={`font-bold text-slate-700 flex items-center gap-2 mb-4`}>
               <span className={`w-3 h-3 rounded-full ${mode === 'sign-to-text' && isRecording ? 'bg-red-500 animate-pulse' : theme.bg}`}></span>
@@ -218,13 +212,29 @@ export default function Demo() {
                   </button>
                 </motion.div>
               ) : (
-                // Camera Mode (Fake Logic Applied Here)
+                // Camera Mode
                 <motion.div key="camera-input" initial={{opacity:0}} animate={{opacity:1}} className="flex-1 flex flex-col">
                   <div className="flex-1 bg-black rounded-2xl overflow-hidden relative min-h-[300px]">
                     {isCameraActive ? (
                       <>
-                        {/* We use Webcam purely for display now, no recording data sent */}
-                        <Webcam ref={webcamRef} audio={false} className="w-full h-full object-cover transform scale-x-[-1]" />
+                        <Webcam 
+                            ref={webcamRef} 
+                            audio={false} 
+                            // هنا التعديل: environment يعني خلفية، user يعني أمامية
+                            videoConstraints={{ facingMode: facingMode }}
+                            // هنا بنشيل الانعكاس لو الكاميرا خلفية
+                            className={`w-full h-full object-cover transition-transform duration-500 ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`} 
+                        />
+                        
+                        {/* زرار قلب الكاميرا */}
+                        <button 
+                            onClick={toggleCameraFacing}
+                            className="absolute top-4 right-4 z-40 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 backdrop-blur-sm transition"
+                            title="Flip Camera"
+                        >
+                            <SwitchCamera size={20} />
+                        </button>
+
                         {isRecording && <div className="absolute top-4 left-4 bg-red-600 text-white px-3 py-1 rounded-full animate-pulse z-30 text-xs font-bold">REC</div>}
                         <div className={`absolute top-0 left-0 w-full h-1 shadow-[0_0_15px] animate-[scan_2s_ease-in-out_infinite] z-20 ${currentMood === 'danger' ? 'bg-red-500 shadow-red-500' : 'bg-teal-400 shadow-teal-400'}`}></div>
                       </>
@@ -240,7 +250,6 @@ export default function Demo() {
             </AnimatePresence>
           </div>
 
-          {/* RIGHT: Output */}
           <div className="lg:w-1/2 bg-slate-900 p-8 flex flex-col relative overflow-hidden">
              <div className="absolute inset-0 opacity-10 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] pointer-events-none"></div>
              <div className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl opacity-20 transition-colors duration-700 ${currentMood === 'danger' ? 'bg-red-600' : currentMood === 'positive' ? 'bg-rose-500' : 'bg-teal-500'}`}></div>
@@ -254,7 +263,6 @@ export default function Demo() {
                 {isProcessing ? (
                     <div className="text-center"><Loader2 size={48} className={`animate-spin mb-4 ${currentMood === 'danger' ? 'text-red-500' : 'text-teal-500'}`}/><p className="text-slate-400">Analyzing Sign Language...</p></div>
                 ) : mode === 'text-to-sign' ? (
-                     // Placeholder for Text-to-Sign in Demo Mode
                     <div className="relative group cursor-pointer w-full flex flex-col items-center">
                         <div className={`w-64 h-64 rounded-full flex items-center justify-center border-4 transition-all duration-500 relative ${theme.border}`}>
                             <Bot size={100} className={`transition-all duration-500 ${theme.text}`} />
@@ -262,7 +270,6 @@ export default function Demo() {
                         <p className="mt-8 text-slate-500 text-sm">Animation Playback</p>
                     </div>
                 ) : (
-                    // Sign-to-Text Result (This will show "I am going to work")
                     <div className="w-full bg-slate-800/50 backdrop-blur-md rounded-2xl p-6 border border-slate-700 min-h-[200px] flex items-center justify-center">
                        <div className="text-center w-full">
                            <h4 className="text-slate-400 text-sm font-bold mb-4 border-b border-slate-700 pb-2">Detected Meaning</h4>
